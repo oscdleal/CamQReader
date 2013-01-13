@@ -1,0 +1,1 @@
+Aplicación de escritorio con la que podrás leer códigos QR desde la Webcam, la he desarrollado con Adobe Flex y esta bajo licencia GNU Gpl3.

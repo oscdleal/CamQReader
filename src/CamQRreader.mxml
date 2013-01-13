@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--**************************************************************************
+* CamQRreader program.
+*
+* Copyright 20012 (c) ODLDEVLABS (http://www.odldevlabs.net) All rights reserved.
+*
+*
+* This program is free software: you can redistribute it and/or modify 
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation, either version 3 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details. 
+* 
+*
+* You should have received a copy of the GNU General Public License
+* along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*
+**************************************************************************-->
+<s:WindowedApplication xmlns:fx="http://ns.adobe.com/mxml/2009"
+					   xmlns:s="library://ns.adobe.com/flex/spark"
+					   xmlns:mx="library://ns.adobe.com/flex/mx"
+					   width="346" height="460" minWidth="346" minHeight="460"
+					   backgroundColor="#404040" creationComplete="inicio();" currentState="State1">
+	<fx:Script>
+		<![CDATA[ 
+			import flash.media.*;
+			import flash.media.Camera;
+			
+			import mx.controls.Alert;
+			import mx.events.FlexEvent;
+			import mx.graphics.codec.JPEGEncoder;
+			import mx.graphics.codec.PNGEncoder;
+			public var v:Video;
+			public var c:Camera;
+			public var b:Bitmap;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import com.logosware.event.QRdecoderEvent;
+			import com.logosware.event.QRreaderEvent;
+			import com.logosware.utils.QRcode.QRdecode;
+			import com.logosware.utils.QRcode.GetQRimage;
+			public var getQRimage:GetQRimage;
+			public var qrDecode:QRdecode = new QRdecode();
+			public var tiempor:Timer = new Timer(2000);
+			public var decodificando:Boolean = new Boolean(false);
+			import flash.media.Sound;
+			import flash.media.SoundChannel;
+			
+			
+			[Embed(source="s1.mp3")]
+			public var SonidoS1:Class;
+			
+			[Embed(source="s3.mp3")]
+			public var SonidoS3:Class;
+
+			public function SonidoDetecta():void
+			{
+				var S1Sound:Sound = new SonidoS1() as Sound;
+				S1Sound.play();
+			}
+			
+			public function SonidoResult():void
+			{
+				var S3Sound:Sound = new SonidoS3() as Sound;
+				S3Sound.play();
+			}
+			
+			public function WebCam():void
+			{
+				uic.addChild(v);
+			}
+			
+			public function inicio():void
+			{
+				tiempor.addEventListener(TimerEvent.TIMER, ontiempo);
+				v = new Video(320, 240);
+				uic.addChild(v);
+				c = Camera.getCamera();
+				c.setQuality(0, 100);
+				c.setMode(320, 240, 20, true);
+				v.attachCamera(c);
+				v.addEventListener(Event.ENTER_FRAME, onEnterFrame);
+				getQRimage = new GetQRimage(v);
+				getQRimage.addEventListener(QRreaderEvent.QR_IMAGE_READ_COMPLETE, onQrImageReadComplete);
+				qrDecode.addEventListener(QRdecoderEvent.QR_DECODE_COMPLETE, onQrDecodeComplete);
+				
+			}
+			public function ontiempo(event:TimerEvent):void
+			{
+				WebCam();
+				tiempor.stop();
+
+			}
+			
+			public function onQrImageReadComplete(e:QRreaderEvent):void{
+				SonidoDetecta();
+				qrDecode.setQR(e.data); 
+				qrDecode.startDecode(); 
+				
+			}
+			public function onQrDecodeComplete(e: QRdecoderEvent):void 
+			{
+
+				var cadena:String = new String(e.data.toString());
+				
+				if(cadena.substr(0,7) == "http://" || cadena.substr(0,7) == "mailto:")
+				{
+					
+						lbl.text = e.data.toString();
+						lbl0.text="DECODIFICADO";
+						decodificando= false;
+						btoReco.label = "Iniciar Decodificación";
+						navigateToURL(new URLRequest(e.data.toString()),'_blank');						
+					}else{
+						if(cadena.substr(0,6) == "smsto:" || cadena.substr(0,6) == "SMSTO:" ){
+							lbl0.text="DECODIFICADO: SMS";	
+
+						}else{
+							if(cadena.substr(0,4) == "tel:" || cadena.substr(0,4) == "TEL:" ){
+								lbl0.text="DECODIFICADO: Teléfono";
+							}else{
+								lbl0.text="DECODIFICADO:";
+
+							}
+								
+						}
+						lbl.text = e.data.toString();
+						
+
+						//capturaFile();
+					}
+				SonidoResult();
+				} 
+				
+			
+			public function onEnterFrame(e: Event):void{
+				if(decodificando){
+					if( c.currentFPS > 0 ){
+						getQRimage.process();
+					}else{
+						lbl0.text="";
+						lbl.text="";
+						lbl1.text="";
+					}
+				}
+		
+			}
+			public function capturaFile():void
+			{
+				tiempor.start();
+
+				var jpgenc:JPEGEncoder = new JPEGEncoder(95);
+				
+				var bb:BitmapData = new BitmapData(320,240,false);
+				bb.draw(v);
+				b = new Bitmap(bb);
+				uic.addChild(b);
+				var imgByteArray:ByteArray = jpgenc.encode(bb);
+				var fl:File = File.desktopDirectory.resolvePath("Captura.jpg");
+				var fs:FileStream = new FileStream();
+				try{
+					fs.open(fl,FileMode.WRITE);
+					fs.writeBytes(imgByteArray);
+					fs.close();
+					lbl1.text = "Guardado en ../Escritorio/Captura.jpg";
+				}catch(e:Error){
+					Alert.show(e.message);
+				}
+			}
+			
+			protected function btoReco_clickHandler(event:MouseEvent):void
+			{
+				// TODO Auto-generated method stub
+				if(decodificando){
+					decodificando = false;
+					btoReco.label = "Iniciar Decodificación";
+				}else{
+					decodificando= true;
+					btoReco.label = "Parar Decodificación";
+
+				}
+			}
+			
+		]]>
+	</fx:Script>
+	<s:states>
+		<s:State name="State1"/>
+	</s:states>
+	
+	
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<mx:Button top="259" label="Captura" click="capturaFile();" horizontalCenter="-123"/>
+	<s:TextArea id="lbl" left="10" right="10" top="287" bottom="46" color="#FFFFFF"
+				contentBackgroundColor="#3F3F3F" fontSize="12" fontWeight="bold" textAlign="center"/>
+	<mx:Label id="lbl0" left="10" right="10" bottom="22" color="#FF0000" fontSize="16"
+			  fontWeight="bold" textAlign="center"/>
+	<mx:Label id="lbl1" left="10" right="10" bottom="3" height="20" color="#A9A9A9" fontSize="12"
+			  fontWeight="bold" textAlign="center"/>
+	<mx:UIComponent id="uic" top="10" width="320" height="240" horizontalCenter="0"
+					maintainProjectionCenter="true"/>
+	<s:Image id="imgMarco" top="10" width="320" height="240" horizontalCenter="0" scaleMode="stretch"
+			 source="marco.png"/>
+	<mx:Button id="btoReco" top="258" label="Iniciar Decodificación"
+			   click="btoReco_clickHandler(event)" horizontalCenter="95" textAlign="right"/>
+</s:WindowedApplication>
